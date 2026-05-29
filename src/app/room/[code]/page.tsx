@@ -596,12 +596,14 @@ export default function RoomPage() {
 
             {/* Guess button */}
             {me && !me.is_eliminated && (
-              <button
-                onClick={handleGuessed}
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-black py-5 rounded-2xl text-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-green-900/50"
-              >
-                ✅ Acertei!
-              </button>
+              <div className="flex justify-center mt-2">
+                <button
+                  onClick={handleGuessed}
+                  className="bg-green-700/60 hover:bg-green-600/80 text-green-200 font-semibold px-6 py-2.5 rounded-xl text-sm border border-green-600/40 transition-all active:scale-95"
+                >
+                  ✅ Acertei!
+                </button>
+              </div>
             )}
           </div>
         )}

@@ -210,21 +210,22 @@ export default function RoomPage() {
     await supabase.from('rooms').update({ current_turn_seat: nextSeat }).eq('id', room.id)
   }
 
-  async function handleGuessed() {
-    if (!myPlayerId || !room) return
-    await supabase.from('players').update({ is_eliminated: true }).eq('id', myPlayerId)
+  async function handleGuessed(playerId: string) {
+    if (!room) return
+    await supabase.from('players').update({ is_eliminated: true }).eq('id', playerId)
 
-    const stillPlaying = players.filter(p => !p.is_eliminated && p.id !== myPlayerId)
+    const stillPlaying = players.filter(p => !p.is_eliminated && p.id !== playerId)
     if (stillPlaying.length === 0) {
       await supabase.from('rooms').update({ status: 'finished' }).eq('id', room.id)
       return
     }
 
-    // Se era minha vez, passa para o próximo
-    if (isMyTurn) {
+    // Se era a vez do jogador que acertou, passa para o próximo
+    const wasTheirTurn = currentTurnPlayer?.id === playerId
+    if (wasTheirTurn) {
       let nextSeat = (currentTurnSeat + 1) % n
       let attempts = 0
-      while ((sorted[nextSeat]?.is_eliminated || sorted[nextSeat]?.id === myPlayerId) && attempts < n) {
+      while ((sorted[nextSeat]?.is_eliminated || sorted[nextSeat]?.id === playerId) && attempts < n) {
         nextSeat = (nextSeat + 1) % n
         attempts++
       }
@@ -548,6 +549,16 @@ export default function RoomPage() {
                   <div className="text-7xl font-black text-white mb-2 wiggle-anim inline-block">???</div>
                   <p className="text-purple-300 text-lg font-semibold">Você não pode ver!</p>
                 </div>
+                {isHost && (
+                  <div className="flex justify-center mt-3">
+                    <button
+                      onClick={() => handleGuessed(me.id)}
+                      className="bg-green-700/60 hover:bg-green-600/80 text-green-200 font-semibold px-5 py-2 rounded-xl text-sm border border-green-600/40 transition-all active:scale-95"
+                    >
+                      ✅ Acertei!
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -588,23 +599,20 @@ export default function RoomPage() {
                       <p className="text-white font-black text-2xl leading-tight break-words">
                         {player.character || '???'}
                       </p>
+                      {isHost && !player.is_eliminated && (
+                        <button
+                          onClick={() => handleGuessed(player.id)}
+                          className="mt-3 bg-black/20 hover:bg-black/40 text-white/70 font-semibold px-4 py-1.5 rounded-lg text-xs border border-white/20 transition-all active:scale-95"
+                        >
+                          ✅ Acertou!
+                        </button>
+                      )}
                     </div>
                   </div>
                 )
               })}
             </div>
 
-            {/* Guess button */}
-            {me && !me.is_eliminated && (
-              <div className="flex justify-center mt-2">
-                <button
-                  onClick={handleGuessed}
-                  className="bg-green-700/60 hover:bg-green-600/80 text-green-200 font-semibold px-6 py-2.5 rounded-xl text-sm border border-green-600/40 transition-all active:scale-95"
-                >
-                  ✅ Acertei!
-                </button>
-              </div>
-            )}
           </div>
         )}
 

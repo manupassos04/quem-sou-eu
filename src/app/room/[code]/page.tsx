@@ -11,6 +11,7 @@ interface Room {
   code: string
   status: GameStatus
   host_player_id: string
+  current_turn_seat: number
 }
 
 interface Player {
@@ -165,6 +166,9 @@ export default function RoomPage() {
   const targetPlayer = n > 0 && myPos >= 0 ? sorted[(myPos - 1 + n) % n] : null
   const alreadyAssigned = targetPlayer?.character != null && targetPlayer.character !== ''
   const assignedCount = players.filter(p => p.character !== null && p.character !== '').length
+  const currentTurnSeat = room?.current_turn_seat ?? 0
+  const currentTurnPlayer = sorted[currentTurnSeat] ?? sorted[0]
+  const isMyTurn = currentTurnPlayer?.id === myPlayerId
 
   async function handleJoin() {
     if (!joinName.trim() || !room) return
@@ -195,6 +199,17 @@ export default function RoomPage() {
     setSubmitting(false)
   }
 
+  async function handleNextTurn() {
+    if (!room) return
+    let nextSeat = (currentTurnSeat + 1) % n
+    let attempts = 0
+    while (sorted[nextSeat]?.is_eliminated && attempts < n) {
+      nextSeat = (nextSeat + 1) % n
+      attempts++
+    }
+    await supabase.from('rooms').update({ current_turn_seat: nextSeat }).eq('id', room.id)
+  }
+
   async function handleGuessed() {
     if (!myPlayerId || !room) return
     await supabase.from('players').update({ is_eliminated: true }).eq('id', myPlayerId)
@@ -202,6 +217,18 @@ export default function RoomPage() {
     const stillPlaying = players.filter(p => !p.is_eliminated && p.id !== myPlayerId)
     if (stillPlaying.length === 0) {
       await supabase.from('rooms').update({ status: 'finished' }).eq('id', room.id)
+      return
+    }
+
+    // Se era minha vez, passa para o próximo
+    if (isMyTurn) {
+      let nextSeat = (currentTurnSeat + 1) % n
+      let attempts = 0
+      while ((sorted[nextSeat]?.is_eliminated || sorted[nextSeat]?.id === myPlayerId) && attempts < n) {
+        nextSeat = (nextSeat + 1) % n
+        attempts++
+      }
+      await supabase.from('rooms').update({ current_turn_seat: nextSeat }).eq('id', room.id)
     }
   }
 
@@ -475,22 +502,57 @@ export default function RoomPage() {
         {/* ===== PLAYING ===== */}
         {room?.status === 'playing' && (
           <div className="mt-6">
+
+            {/* TURN BANNER */}
+            {currentTurnPlayer && (
+              <div className="mb-6">
+                {isMyTurn && !me?.is_eliminated ? (
+                  <div className="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-3xl p-6 text-center shadow-2xl shadow-orange-900/50 glow-anim">
+                    <p className="text-white/80 text-sm font-semibold uppercase tracking-widest mb-1">É a sua vez!</p>
+                    <p className="text-white text-2xl font-black mb-1">🎤 Faça uma pergunta</p>
+                    <p className="text-white/70 text-sm">Pergunte sim ou não para qualquer pessoa</p>
+                    <button
+                      onClick={handleNextTurn}
+                      className="mt-4 w-full bg-white/20 hover:bg-white/30 text-white font-black py-3 rounded-2xl text-lg transition-all transform hover:scale-105 active:scale-95"
+                    >
+                      Já perguntei → Próximo ▶
+                    </button>
+                  </div>
+                ) : (
+                  <div className={`bg-gradient-to-r ${getColor(sorted.findIndex(p => p.id === currentTurnPlayer.id)).bg} rounded-3xl p-5 flex items-center gap-4 shadow-xl`}>
+                    <div className="text-4xl">🎤</div>
+                    <div className="flex-1">
+                      <p className="text-white/70 text-sm font-semibold uppercase tracking-wider">Vez de perguntar</p>
+                      <p className="text-white text-2xl font-black">{currentTurnPlayer.name}</p>
+                    </div>
+                    {(isHost) && (
+                      <button
+                        onClick={handleNextTurn}
+                        className="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl text-sm transition-all"
+                      >
+                        Próximo ▶
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* YOUR mystery card */}
             {me && !me.is_eliminated && (
-              <div className="mb-8">
+              <div className="mb-6">
                 <p className="text-purple-300 text-sm uppercase tracking-widest font-semibold text-center mb-3">
                   Na sua testa 👆
                 </p>
                 <div className="bg-black/60 border-2 border-purple-500/50 rounded-3xl p-8 text-center glow-anim">
                   <div className="text-7xl font-black text-white mb-2 wiggle-anim inline-block">???</div>
                   <p className="text-purple-300 text-lg font-semibold">Você não pode ver!</p>
-                  <p className="text-white/40 text-sm mt-1">Faça perguntas de sim/não para descobrir</p>
                 </div>
               </div>
             )}
 
             {me?.is_eliminated && (
-              <div className="mb-8 bg-green-500/10 border-2 border-green-500/30 rounded-3xl p-6 text-center">
+              <div className="mb-6 bg-green-500/10 border-2 border-green-500/30 rounded-3xl p-6 text-center">
                 <div className="text-5xl mb-2">🎊</div>
                 <p className="text-green-400 text-xl font-black">Você adivinhou!</p>
                 <p className="text-white/50 text-sm mt-1">Você era: <strong className="text-white">{me.character}</strong></p>
@@ -502,21 +564,23 @@ export default function RoomPage() {
               Os outros jogadores
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-              {sorted.filter(p => p.id !== myPlayerId).map((player, i) => {
+              {sorted.filter(p => p.id !== myPlayerId).map((player) => {
                 const colorIndex = players.findIndex(p => p.id === player.id)
                 const color = getColor(colorIndex)
+                const isTurn = player.id === currentTurnPlayer?.id
                 return (
                   <div
                     key={player.id}
-                    className={`relative rounded-3xl overflow-hidden transition-all ${
-                      player.is_eliminated ? 'opacity-50' : ''
-                    }`}
+                    className={`relative rounded-3xl overflow-hidden transition-all ${player.is_eliminated ? 'opacity-40' : ''} ${isTurn ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-transparent' : ''}`}
                   >
                     <div className={`bg-gradient-to-br ${color.bg} p-5 shadow-xl ${color.shadow} shadow-lg`}>
                       {player.is_eliminated && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-3xl z-10">
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-3xl z-10">
                           <span className="text-5xl">✅</span>
                         </div>
+                      )}
+                      {isTurn && !player.is_eliminated && (
+                        <div className="absolute top-3 right-3 text-xl">🎤</div>
                       )}
                       <p className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">
                         {player.name} é...
@@ -536,7 +600,7 @@ export default function RoomPage() {
                 onClick={handleGuessed}
                 className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-black py-5 rounded-2xl text-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-green-900/50"
               >
-                🎯 Eu Adivinhe! Sei quem sou!
+                ✅ Acertei!
               </button>
             )}
           </div>

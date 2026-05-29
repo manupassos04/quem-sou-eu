@@ -9,8 +9,12 @@ CREATE TABLE IF NOT EXISTS rooms (
   code TEXT UNIQUE NOT NULL,
   status TEXT NOT NULL DEFAULT 'lobby' CHECK (status IN ('lobby', 'assigning', 'playing', 'finished')),
   host_player_id UUID,
+  current_turn_seat INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Se já criou o banco antes, rode só esta linha:
+-- ALTER TABLE rooms ADD COLUMN IF NOT EXISTS current_turn_seat INTEGER NOT NULL DEFAULT 0;
 
 -- Tabela de jogadores
 CREATE TABLE IF NOT EXISTS players (

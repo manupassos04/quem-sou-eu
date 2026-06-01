@@ -600,7 +600,7 @@ export default function RoomPage() {
                             {player.name} é...
                           </p>
                           <p className="text-white font-black text-xl leading-tight break-words flex-1">
-                            {player.character ?? '???'}
+                            {player.character && player.character !== '__HIDDEN__' ? player.character : '???'}
                           </p>
                           {isHost && (
                             <button

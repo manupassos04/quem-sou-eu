@@ -30,9 +30,13 @@ export async function GET(
 
   if (!players) return NextResponse.json([])
 
-  // Remove o personagem do próprio jogador — ele nunca chega ao browser
+  // Substitui o personagem do próprio jogador por um marcador:
+  // - null → continua null (não foi atribuído ainda)
+  // - valor real → '__HIDDEN__' (foi atribuído, mas o conteúdo não vaza pro browser)
   const filtered = players.map(p =>
-    p.id === playerId ? { ...p, character: null } : p
+    p.id === playerId && p.character !== null
+      ? { ...p, character: '__HIDDEN__' }
+      : p
   )
 
   return NextResponse.json(filtered)

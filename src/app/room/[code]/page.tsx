@@ -103,14 +103,11 @@ export default function RoomPage() {
   const roomRef = useRef<Room | null>(null)
   roomRef.current = room
 
-  const fetchPlayers = useCallback(async (roomId: string) => {
-    const { data } = await supabase
-      .from('players')
-      .select('*')
-      .eq('room_id', roomId)
-      .order('created_at')
-    if (data) setPlayers(data)
-  }, [])
+  const fetchPlayers = useCallback(async () => {
+    const storedPlayerId = localStorage.getItem(`room_${code}_playerId`) ?? ''
+    const res = await fetch(`/api/room/${code}/players?playerId=${storedPlayerId}`)
+    if (res.ok) setPlayers(await res.json())
+  }, [code])
 
   useEffect(() => {
     const storedId = localStorage.getItem(`room_${code}_playerId`)
@@ -125,14 +122,14 @@ export default function RoomPage() {
       if (!roomData) { setError('Sala não encontrada 😕'); setLoading(false); return }
 
       setRoom(roomData)
-      await fetchPlayers(roomData.id)
+      await fetchPlayers()
       setLoading(false)
 
       channel = supabase.channel(`room:${code}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `code=eq.${code}` },
           (p) => setRoom(p.new as Room))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomData.id}` },
-          () => fetchPlayers(roomData.id))
+          () => fetchPlayers())
         .subscribe()
     }
 
@@ -570,11 +567,11 @@ export default function RoomPage() {
               </div>
             )}
 
-            {/* Other players */}
+            {/* Other players — horizontal scroll */}
             <p className="text-white/50 text-sm uppercase tracking-widest font-semibold mb-4">
               Os outros jogadores
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 mb-6" style={{ scrollSnapType: 'x mandatory' }}>
               {sorted.filter(p => p.id !== myPlayerId).map((player) => {
                 const colorIndex = players.findIndex(p => p.id === player.id)
                 const color = getColor(colorIndex)
@@ -582,30 +579,38 @@ export default function RoomPage() {
                 return (
                   <div
                     key={player.id}
-                    className={`relative rounded-3xl overflow-hidden transition-all ${player.is_eliminated ? 'opacity-40' : ''} ${isTurn ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-transparent' : ''}`}
+                    style={{ scrollSnapAlign: 'start' }}
+                    className={`flex-shrink-0 w-44 rounded-3xl overflow-hidden transition-all duration-300
+                      ${player.is_eliminated ? 'opacity-40 scale-95' : ''}
+                      ${isTurn && !player.is_eliminated ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-[#0f0a1e] scale-105 shadow-2xl shadow-yellow-500/30' : ''}`}
                   >
-                    <div className={`bg-gradient-to-br ${color.bg} p-5 shadow-xl ${color.shadow} shadow-lg`}>
-                      {player.is_eliminated && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-3xl z-10">
+                    <div className={`bg-gradient-to-br ${color.bg} p-4 h-full flex flex-col min-h-[180px]`}>
+                      {isTurn && !player.is_eliminated && (
+                        <span className="self-start bg-yellow-400 text-black text-xs font-black px-2 py-0.5 rounded-full mb-3 animate-pulse">
+                          🎤 VEZ DELE
+                        </span>
+                      )}
+                      {player.is_eliminated ? (
+                        <div className="flex-1 flex items-center justify-center">
                           <span className="text-5xl">✅</span>
                         </div>
-                      )}
-                      {isTurn && !player.is_eliminated && (
-                        <div className="absolute top-3 right-3 text-xl">🎤</div>
-                      )}
-                      <p className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">
-                        {player.name} é...
-                      </p>
-                      <p className="text-white font-black text-2xl leading-tight break-words">
-                        {player.character || '???'}
-                      </p>
-                      {isHost && !player.is_eliminated && (
-                        <button
-                          onClick={() => handleGuessed(player.id)}
-                          className="mt-3 bg-black/20 hover:bg-black/40 text-white/70 font-semibold px-4 py-1.5 rounded-lg text-xs border border-white/20 transition-all active:scale-95"
-                        >
-                          ✅ Acertou!
-                        </button>
+                      ) : (
+                        <>
+                          <p className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-1">
+                            {player.name} é...
+                          </p>
+                          <p className="text-white font-black text-xl leading-tight break-words flex-1">
+                            {player.character ?? '???'}
+                          </p>
+                          {isHost && (
+                            <button
+                              onClick={() => handleGuessed(player.id)}
+                              className="mt-3 bg-black/20 hover:bg-black/40 text-white/80 font-semibold px-3 py-1.5 rounded-lg text-xs border border-white/20 transition-all active:scale-95 w-full"
+                            >
+                              ✅ Acertou!
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

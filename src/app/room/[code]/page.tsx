@@ -571,7 +571,7 @@ export default function RoomPage() {
             <p className="text-white/50 text-sm uppercase tracking-widest font-semibold mb-4">
               Os outros jogadores
             </p>
-            <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 mb-6" style={{ scrollSnapType: 'x mandatory' }}>
+            <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
               {sorted.filter(p => p.id !== myPlayerId).map((player) => {
                 const colorIndex = players.findIndex(p => p.id === player.id)
                 const color = getColor(colorIndex)
@@ -579,8 +579,7 @@ export default function RoomPage() {
                 return (
                   <div
                     key={player.id}
-                    style={{ scrollSnapAlign: 'start' }}
-                    className={`flex-shrink-0 w-44 rounded-3xl overflow-hidden transition-all duration-300
+                    className={`rounded-3xl overflow-hidden transition-all duration-300
                       ${player.is_eliminated ? 'opacity-40 scale-95' : ''}
                       ${isTurn && !player.is_eliminated ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-[#0f0a1e] scale-105 shadow-2xl shadow-yellow-500/30' : ''}`}
                   >

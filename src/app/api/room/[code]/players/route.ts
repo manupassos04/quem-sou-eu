@@ -30,11 +30,10 @@ export async function GET(
 
   if (!players) return NextResponse.json([])
 
-  // Substitui o personagem do próprio jogador por um marcador:
-  // - null → continua null (não foi atribuído ainda)
-  // - valor real → '__HIDDEN__' (foi atribuído, mas o conteúdo não vaza pro browser)
+  // Oculta o personagem do próprio jogador enquanto ele ainda está jogando.
+  // Após acertar (is_eliminated = true), revela o personagem pra mostrar "você era X".
   const filtered = players.map(p =>
-    p.id === playerId && p.character !== null
+    p.id === playerId && p.character !== null && !p.is_eliminated
       ? { ...p, character: '__HIDDEN__' }
       : p
   )
